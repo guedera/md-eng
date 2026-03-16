@@ -1,0 +1,13 @@
+[project]
+name = "md-eng"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "insperautograder",
+    "mysql-connector-python==8.3.0",
+    "pandas>=2.3",
+    "python-dotenv>=1.1",
+]
+
+[tool.uv.sources]
+insperautograder = { git = "https://github.com/macielcalebe/insperautograding.git" }
