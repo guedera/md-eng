@@ -5,74 +5,73 @@ O objetivo da normalização é organizar as tabelas para reduzir a redundância
 ---
 
 ## 1ª Forma Normal (1NF): Atomicidade
-**Regra:** Cada campo deve conter apenas valores atômicos (indivisíveis) e não podem existir grupos repetidos ou listas dentro de uma célula.
 
-* **Problema:** Uma coluna `Telefones` com múltiplos números ("9999-1111, 8888-2222").
-* **Solução:** Criar linhas separadas para cada valor ou uma tabela secundária.
+**Regra:** Cada campo deve conter apenas valores atômicos (indivisíveis). Não podem existir grupos repetidos ou listas dentro de uma única célula.
 
-### Exemplo prático:
-| ID_User | Nome | Hobby |
-| :--- | :--- | :--- |
-| 1 | Guilherme | Guitarra, F1 |
+**Problema:** Uma coluna `Hobby` com múltiplos valores em uma célula.
 
-**Correção (1NF):**
-| ID_User | Nome | Hobby |
-| :--- | :--- | :--- |
-| 1 | Guilherme | Guitarra |
-| 1 | Guilherme | F1 |
+| ID_User | Nome      | Hobby        |
+| :------ | :-------- | :----------- |
+| 1       | Guilherme | Guitarra, F1 |
+
+**Correção (1NF):** Separar cada valor em sua própria linha.
+
+| ID_User | Nome      | Hobby    |
+| :------ | :-------- | :------- |
+| 1       | Guilherme | Guitarra |
+| 1       | Guilherme | F1       |
+
+> **Consequência de não normalizar:** É necessário usar funções de string complexas para extrair dados, o que prejudica a performance e a legibilidade.
+
+### Exemplo de workaround sem 1NF — `SUBSTRING_INDEX`
+
+A função `SUBSTRING_INDEX(string, delimitador, contador)` fatia textos:
+- Contador **positivo** → retorna tudo à **esquerda** do delimitador na ocorrência N.
+- Contador **negativo** → retorna tudo à **direita** do delimitador na ocorrência N (contando de trás para frente).
+
+Para isolar `"São Paulo"` de `"Rua X, 123, CEP, São Paulo, SP"`:
+
+```sql
+-- Passo 1: -2 pega os dois últimos tokens: "São Paulo, SP"
+-- Passo 2:  1 pega o primeiro token do resultado: "São Paulo"
+SELECT SUBSTRING_INDEX(SUBSTRING_INDEX(endereco1, ', ', -2), ', ', 1) AS cidade
+FROM alunos;
+```
 
 ---
 
 ## 2ª Forma Normal (2NF): Dependência Funcional Total
-**Regra:** A tabela deve estar na 1NF e todos os atributos que não são chave devem depender da **Chave Primária completa**. Isto aplica-se a tabelas com chaves compostas.
 
-* **Problema:** Numa tabela com chave `(ID_Pedido, ID_Produto)`, o `Nome_Produto` depende apenas do `ID_Produto`, e não da combinação total.
-* **Solução:** Mover os dados que dependem apenas de parte da chave para uma nova tabela.
+**Pré-requisito:** A tabela deve estar na 1NF.
 
-### Exemplo prático:
+**Regra:** Todo atributo não-chave deve depender da **chave primária completa** — não apenas de parte dela. Aplica-se a tabelas com chaves compostas.
+
+**Problema:** Na tabela abaixo, `Descrição_Prod` depende só de `ID_Prod`, e não da chave composta `(ID_Pedido, ID_Prod)`.
+
 | ID_Pedido (PK) | ID_Prod (PK) | Descrição_Prod | Qtd |
-| :--- | :--- | :--- | :--- |
-| 500 | 10 | Teclado | 1 |
+| :------------- | :----------- | :------------- | :-- |
+| 500            | 10           | Teclado        | 1   |
 
-**Correção (2NF):**
-* **Tabela Itens_Pedido:** `ID_Pedido`, `ID_Prod`, `Qtd`
-* **Tabela Produtos:** `ID_Prod`, `Descrição_Prod`
+**Correção (2NF):** Mover o atributo com dependência parcial para uma tabela própria.
+
+- **Tabela `Itens_Pedido`:** `ID_Pedido`, `ID_Prod`, `Qtd`
+- **Tabela `Produtos`:** `ID_Prod`, `Descrição_Prod`
 
 ---
 
 ## 3ª Forma Normal (3NF): Dependência Transitiva
-**Regra:** A tabela deve estar na 2NF e não podem existir dependências entre colunas que não são chaves. Uma coluna não-chave não deve depender de outra coluna não-chave.
 
-* **Problema:** Numa tabela `Funcionário`, a coluna `Estado` depende da `Cidade`, que por sua vez depende do `ID_Func`.
-* **Solução:** Isolar os campos dependentes noutra tabela (ex: uma tabela de Cidades/Localidades).
+**Pré-requisito:** A tabela deve estar na 2NF.
 
-### Exemplo prático:
-| ID_Func (PK) | Nome | Cidade | Estado |
-| :--- | :--- | :--- | :--- |
-| 123 | Silva | São Paulo | SP |
+**Regra:** Nenhum atributo não-chave deve depender de outro atributo não-chave. A dependência deve ser sempre direta com a chave primária.
 
-**Correção (3NF):**
-* **Tabela Funcionários:** `ID_Func`, `Nome`, `ID_Cidade`
-* **Tabela Cidades:** `ID_Cidade`, `Nome_Cidade`, `Estado`
+**Problema:** `Estado` depende de `Cidade`, que depende de `ID_Func` — dependência transitiva.
 
-# Normalização de Dados: 1NF, 2NF e 3NF (Atualizado com SQL)
+| ID_Func (PK) | Nome  | Cidade    | Estado |
+| :----------- | :---- | :-------- | :----- |
+| 123          | Silva | São Paulo | SP     |
 
-O objetivo da normalização é organizar as tabelas para reduzir a redundância e evitar anomalias de inserção, atualização e eliminação.
+**Correção (3NF):** Isolar a dependência transitiva em uma tabela separada.
 
----
-
-## 1ª Forma Normal (1NF): Atomicidade
-**Regra:** Cada campo deve conter apenas valores atômicos (indivisíveis) e não podem existir grupos repetidos ou listas dentro de uma única célula.
-
-* **O Problema:** Colunas desnormalizadas que guardam múltiplos dados (ex: `Endereço` misturando Rua, Cidade e Estado).
-* **A Consequência:** Você é obrigado a usar funções de string complexas para extrair informações simples.
-
-### Exemplo de Manipulação (O uso de `SUBSTRING_INDEX`)
-Se a tabela viola a 1NF e a cidade está "presa" em uma string de endereço, você precisa do "corte duplo":
-
-```sql
--- Exemplo: "Dos Quebradas Place, 220, 50877672, São Paulo, SP"
--- Objetivo: Isolar "São Paulo" (o penúltimo item da lista)
-SELECT 
-    SUBSTRING_INDEX(SUBSTRING_INDEX(endereco1, ', ', -2), ', ', 1) AS cidade 
-FROM alunos;
+- **Tabela `Funcionários`:** `ID_Func`, `Nome`, `ID_Cidade`
+- **Tabela `Cidades`:** `ID_Cidade`, `Nome_Cidade`, `Estado`
